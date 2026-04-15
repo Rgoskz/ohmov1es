@@ -43,7 +43,7 @@ const AuthPage = () => {
         if (error) throw error;
         toast({
           title: 'Conta criada!',
-          description: 'Verifique seu email para confirmar.',
+          description: 'Bem-vindo ao Ohmov1es!',
         });
       }
     } catch (err: any) {
