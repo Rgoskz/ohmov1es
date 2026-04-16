@@ -20,7 +20,7 @@ const AuthPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) navigate('/dashboard', { replace: true });
+    if (user) navigate('/discover', { replace: true });
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
