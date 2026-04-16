@@ -14,6 +14,19 @@ const DiscoverPage = () => {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState<number | null>(null);
+  const [inListIds, setInListIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('movies')
+      .select('tmdb_id')
+      .eq('user_id', user.id)
+      .not('tmdb_id', 'is', null)
+      .then(({ data }) => {
+        if (data) setInListIds(new Set(data.map((m) => m.tmdb_id as number)));
+      });
+  }, [user]);
 
   const filtered = popularMovies.filter((m) =>
     m.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -21,21 +34,8 @@ const DiscoverPage = () => {
   );
 
   const addToWatchlist = async (movie: PopularMovie) => {
-    if (!user) return;
+    if (!user || inListIds.has(movie.tmdb_id)) return;
     setAdding(movie.tmdb_id);
-
-    const { data: existing } = await supabase
-      .from('movies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('tmdb_id', movie.tmdb_id)
-      .maybeSingle();
-
-    if (existing) {
-      toast({ title: 'Filme já está na sua lista', variant: 'destructive' });
-      setAdding(null);
-      return;
-    }
 
     const { error } = await supabase.from('movies').insert({
       user_id: user.id,
@@ -50,6 +50,7 @@ const DiscoverPage = () => {
     if (error) {
       toast({ title: 'Erro ao adicionar', description: error.message, variant: 'destructive' });
     } else {
+      setInListIds((prev) => new Set(prev).add(movie.tmdb_id));
       toast({ title: 'Adicionado à watchlist!', description: movie.title });
     }
     setAdding(null);
