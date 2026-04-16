@@ -1,9 +1,10 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Film, LayoutDashboard, List, Upload, Settings, LogOut } from 'lucide-react';
+import { Film, LayoutDashboard, List, Upload, Settings, LogOut, Compass } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 const navItems = [
+  { to: '/discover', icon: Compass, label: 'Descobrir' },
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/movies', icon: List, label: 'Watchlist' },
   { to: '/history', icon: Film, label: 'Assistidos' },
