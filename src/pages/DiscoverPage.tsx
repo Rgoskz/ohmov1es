@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Star, Search, TrendingUp } from 'lucide-react';
+import { Plus, Star, Search, TrendingUp, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/AppLayout';
@@ -14,6 +14,19 @@ const DiscoverPage = () => {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState<number | null>(null);
+  const [inListIds, setInListIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('movies')
+      .select('tmdb_id')
+      .eq('user_id', user.id)
+      .not('tmdb_id', 'is', null)
+      .then(({ data }) => {
+        if (data) setInListIds(new Set(data.map((m) => m.tmdb_id as number)));
+      });
+  }, [user]);
 
   const filtered = popularMovies.filter((m) =>
     m.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -21,21 +34,8 @@ const DiscoverPage = () => {
   );
 
   const addToWatchlist = async (movie: PopularMovie) => {
-    if (!user) return;
+    if (!user || inListIds.has(movie.tmdb_id)) return;
     setAdding(movie.tmdb_id);
-
-    const { data: existing } = await supabase
-      .from('movies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('tmdb_id', movie.tmdb_id)
-      .maybeSingle();
-
-    if (existing) {
-      toast({ title: 'Filme já está na sua lista', variant: 'destructive' });
-      setAdding(null);
-      return;
-    }
 
     const { error } = await supabase.from('movies').insert({
       user_id: user.id,
@@ -50,6 +50,7 @@ const DiscoverPage = () => {
     if (error) {
       toast({ title: 'Erro ao adicionar', description: error.message, variant: 'destructive' });
     } else {
+      setInListIds((prev) => new Set(prev).add(movie.tmdb_id));
       toast({ title: 'Adicionado à watchlist!', description: movie.title });
     }
     setAdding(null);
@@ -105,11 +106,21 @@ const DiscoverPage = () => {
                 <Button
                   size="sm"
                   onClick={() => addToWatchlist(movie)}
-                  disabled={adding === movie.tmdb_id}
-                  className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  disabled={adding === movie.tmdb_id || inListIds.has(movie.tmdb_id)}
+                  variant={inListIds.has(movie.tmdb_id) ? 'secondary' : 'default'}
+                  className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100 disabled:group-hover:opacity-100"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  {adding === movie.tmdb_id ? 'Adicionando...' : 'Quero ver'}
+                  {inListIds.has(movie.tmdb_id) ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                      Na lista
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      {adding === movie.tmdb_id ? 'Adicionando...' : 'Quero ver'}
+                    </>
+                  )}
                 </Button>
               </div>
               <div className="p-2.5">
