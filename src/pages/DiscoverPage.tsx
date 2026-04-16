@@ -106,11 +106,21 @@ const DiscoverPage = () => {
                 <Button
                   size="sm"
                   onClick={() => addToWatchlist(movie)}
-                  disabled={adding === movie.tmdb_id}
-                  className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  disabled={adding === movie.tmdb_id || inListIds.has(movie.tmdb_id)}
+                  variant={inListIds.has(movie.tmdb_id) ? 'secondary' : 'default'}
+                  className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100 disabled:group-hover:opacity-100"
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  {adding === movie.tmdb_id ? 'Adicionando...' : 'Quero ver'}
+                  {inListIds.has(movie.tmdb_id) ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                      Na lista
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      {adding === movie.tmdb_id ? 'Adicionando...' : 'Quero ver'}
+                    </>
+                  )}
                 </Button>
               </div>
               <div className="p-2.5">
