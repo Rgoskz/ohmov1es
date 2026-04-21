@@ -17,6 +17,9 @@ const DiscoverPage = () => {
   const [inListIds, setInListIds] = useState<Set<number>>(new Set());
   const [movies, setMovies] = useState<PopularMovie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     if (!user) return;
@@ -30,29 +33,39 @@ const DiscoverPage = () => {
       });
   }, [user]);
 
+  const fetchMovies = async (targetPage: number, append: boolean) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+
+    const { data, error } = await supabase.functions.invoke('tmdb-popular', {
+      body: { page: targetPage },
+    });
+
+    if (error || data?.error) {
+      toast({
+        title: 'Erro ao carregar filmes',
+        description: error?.message || data?.error,
+        variant: 'destructive',
+      });
+    } else {
+      const newMovies: PopularMovie[] = data?.movies || [];
+      setMovies((prev) => {
+        if (!append) return newMovies;
+        const seen = new Set(prev.map((m) => m.tmdb_id));
+        return [...prev, ...newMovies.filter((m) => !seen.has(m.tmdb_id))];
+      });
+      setPage(data?.page ?? targetPage);
+      setTotalPages(data?.total_pages ?? 1);
+    }
+
+    setLoading(false);
+    setLoadingMore(false);
+  };
+
   useEffect(() => {
-    let cancelled = false;
-    const fetchMovies = async () => {
-      setLoading(true);
-      const { data, error } = await supabase.functions.invoke('tmdb-popular');
-      if (cancelled) return;
-      if (error || data?.error) {
-        toast({
-          title: 'Erro ao carregar filmes',
-          description: error?.message || data?.error,
-          variant: 'destructive',
-        });
-        setMovies([]);
-      } else {
-        setMovies(data?.movies || []);
-      }
-      setLoading(false);
-    };
-    fetchMovies();
-    return () => {
-      cancelled = true;
-    };
-  }, [toast]);
+    fetchMovies(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = movies.filter((m) =>
     m.title.toLowerCase().includes(search.toLowerCase()) ||
