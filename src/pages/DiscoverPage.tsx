@@ -172,6 +172,27 @@ const DiscoverPage = () => {
             <p className="text-sm text-muted-foreground font-body">Nenhum filme encontrado</p>
           </div>
         )}
+
+        {!loading && !search && page < totalPages && (
+          <div className="flex justify-center mt-10">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => fetchMovies(page + 1, true)}
+              disabled={loadingMore}
+              className="min-w-[180px]"
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Carregando...
+                </>
+              ) : (
+                <>Buscar mais</>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

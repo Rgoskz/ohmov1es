@@ -16,8 +16,18 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const page = url.searchParams.get('page') || '1';
-    const language = url.searchParams.get('language') || 'en-US';
+    let page = url.searchParams.get('page') || '1';
+    let language = url.searchParams.get('language') || 'en-US';
+
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json();
+        if (body?.page) page = String(body.page);
+        if (body?.language) language = String(body.language);
+      } catch {
+        // ignore empty body
+      }
+    }
 
     const response = await fetch(
       `https://api.themoviedb.org/3/movie/popular?language=${language}&page=${page}`,
