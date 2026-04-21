@@ -65,10 +65,17 @@ Deno.serve(async (req) => {
         .filter(Boolean),
     }));
 
-    return new Response(JSON.stringify({ movies }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        movies,
+        page: data.page ?? Number(page),
+        total_pages: data.total_pages ?? 1,
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('tmdb-popular error:', message);
