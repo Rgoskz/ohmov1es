@@ -16,8 +16,18 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const page = url.searchParams.get('page') || '1';
-    const language = url.searchParams.get('language') || 'en-US';
+    let page = url.searchParams.get('page') || '1';
+    let language = url.searchParams.get('language') || 'en-US';
+
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json();
+        if (body?.page) page = String(body.page);
+        if (body?.language) language = String(body.language);
+      } catch {
+        // ignore empty body
+      }
+    }
 
     const response = await fetch(
       `https://api.themoviedb.org/3/movie/popular?language=${language}&page=${page}`,
@@ -65,10 +75,17 @@ Deno.serve(async (req) => {
         .filter(Boolean),
     }));
 
-    return new Response(JSON.stringify({ movies }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        movies,
+        page: data.page ?? Number(page),
+        total_pages: data.total_pages ?? 1,
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('tmdb-popular error:', message);
