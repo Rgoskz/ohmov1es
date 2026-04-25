@@ -4,20 +4,17 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 };
 
+const WEBHOOK_URL = 'https://sakzq1.app.n8n.cloud/webhook/tmdb';
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const token = Deno.env.get('TMDB_API_TOKEN');
-    if (!token) {
-      throw new Error('TMDB_API_TOKEN is not configured');
-    }
-
     const url = new URL(req.url);
     let page = url.searchParams.get('page') || '1';
-    let language = url.searchParams.get('language') || 'en-US';
+    let language = url.searchParams.get('language') || 'pt-BR';
 
     if (req.method === 'POST') {
       try {
@@ -29,57 +26,58 @@ Deno.serve(async (req) => {
       }
     }
 
-    const response = await fetch(
-      `https://api.themoviedb.org/3/movie/popular?language=${language}&page=${page}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          accept: 'application/json',
-        },
-      }
-    );
+    const webhookUrl = `${WEBHOOK_URL}?language=${encodeURIComponent(language)}&page=${encodeURIComponent(page)}`;
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { accept: 'application/json' },
+    });
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`TMDB API error [${response.status}]: ${text}`);
+      throw new Error(`Webhook error [${response.status}]: ${text}`);
     }
 
-    const data = await response.json();
+    const raw = await response.json();
 
-    // Fetch genre list to map IDs to names
-    const genreRes = await fetch(
-      `https://api.themoviedb.org/3/genre/movie/list?language=${language}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          accept: 'application/json',
-        },
-      }
-    );
-    const genreData = await genreRes.json();
-    const genreMap = new Map<number, string>(
-      (genreData.genres || []).map((g: { id: number; name: string }) => [g.id, g.name])
-    );
+    // The n8n webhook may return either a TMDB-shaped payload directly,
+    // or an array wrapper. Normalize both.
+    const data = Array.isArray(raw) ? raw[0] : raw;
+    const results: any[] = data?.results || data?.movies || [];
 
-    const movies = (data.results || []).map((m: any) => ({
-      tmdb_id: m.id,
-      title: m.title,
-      year: m.release_date ? parseInt(m.release_date.substring(0, 4), 10) : null,
-      poster_url: m.poster_path
+    // Optional embedded genre map: { genres: [{id,name}] } or { genre_map: {...} }
+    let genreMap = new Map<number, string>();
+    if (Array.isArray(data?.genres)) {
+      genreMap = new Map(data.genres.map((g: any) => [g.id, g.name]));
+    } else if (data?.genre_map && typeof data.genre_map === 'object') {
+      genreMap = new Map(
+        Object.entries(data.genre_map).map(([k, v]) => [Number(k), String(v)])
+      );
+    }
+
+    const movies = results.map((m: any) => ({
+      tmdb_id: m.id ?? m.tmdb_id,
+      title: m.title ?? m.name ?? '',
+      year: m.release_date ? parseInt(String(m.release_date).substring(0, 4), 10) : null,
+      poster_url: m.poster_url
+        ? m.poster_url
+        : m.poster_path
         ? `https://image.tmdb.org/t/p/w500${m.poster_path}`
         : '/placeholder.svg',
       overview: m.overview || '',
-      rating: m.vote_average || 0,
-      genres: (m.genre_ids || [])
-        .map((id: number) => genreMap.get(id))
-        .filter(Boolean),
+      rating: m.vote_average ?? m.rating ?? 0,
+      genres: Array.isArray(m.genres)
+        ? m.genres.map((g: any) => (typeof g === 'string' ? g : g?.name)).filter(Boolean)
+        : (m.genre_ids || [])
+            .map((id: number) => genreMap.get(id))
+            .filter(Boolean),
     }));
 
     return new Response(
       JSON.stringify({
         movies,
-        page: data.page ?? Number(page),
-        total_pages: data.total_pages ?? 1,
+        page: data?.page ?? Number(page),
+        total_pages: data?.total_pages ?? 1,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

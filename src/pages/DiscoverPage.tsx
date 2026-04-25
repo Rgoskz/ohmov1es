@@ -38,7 +38,7 @@ const DiscoverPage = () => {
     else setLoading(true);
 
     const { data, error } = await supabase.functions.invoke('tmdb-popular', {
-      body: { page: targetPage },
+      body: { page: targetPage, language: 'pt-BR' },
     });
 
     if (error || data?.error) {
