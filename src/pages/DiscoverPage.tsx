@@ -78,94 +78,67 @@ const DiscoverPage = () => {
           />
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {filtered.map((movie, i) => (
-              <motion.div
-                key={movie.tmdb_id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-                className="group relative rounded-lg overflow-hidden bg-card border border-border hover:border-primary/50 transition-all"
-              >
-                <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
-                  <img
-                    src={movie.poster_url}
-                    alt={`Pôster de ${movie.title}`}
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/placeholder.svg';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-background/80 backdrop-blur-sm">
-                    <Star className="h-3 w-3 fill-primary text-primary" />
-                    <span className="text-xs font-body font-semibold text-foreground">
-                      {movie.rating.toFixed(1)}
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => addToWatchlist(movie)}
-                    disabled={adding === movie.tmdb_id || inListIds.has(movie.tmdb_id)}
-                    variant={inListIds.has(movie.tmdb_id) ? 'secondary' : 'default'}
-                    className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100 disabled:group-hover:opacity-100"
-                  >
-                    {inListIds.has(movie.tmdb_id) ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Na lista
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        {adding === movie.tmdb_id ? 'Adicionando...' : 'Quero ver'}
-                      </>
-                    )}
-                  </Button>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {filtered.map((movie, i) => (
+            <motion.div
+              key={movie.tmdb_id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04 }}
+              className="group relative rounded-lg overflow-hidden bg-card border border-border hover:border-primary/50 transition-all"
+            >
+              <div className="relative aspect-[2/3] overflow-hidden bg-secondary">
+                <img
+                  src={movie.poster_url}
+                  alt={`Pôster de ${movie.title}`}
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/placeholder.svg';
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-md bg-background/80 backdrop-blur-sm">
+                  <Star className="h-3 w-3 fill-primary text-primary" />
+                  <span className="text-xs font-body font-semibold text-foreground">
+                    {movie.rating.toFixed(1)}
+                  </span>
                 </div>
-                <div className="p-2.5">
-                  <h3 className="font-heading text-xs font-bold text-foreground truncate" title={movie.title}>
-                    {movie.title}
-                  </h3>
-                  <p className="text-[10px] text-muted-foreground font-body mt-0.5">
-                    {movie.year} · {movie.genres[0] || '—'}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
+                <Button
+                  size="sm"
+                  onClick={() => addToWatchlist(movie)}
+                  disabled={adding === movie.tmdb_id || inListIds.has(movie.tmdb_id)}
+                  variant={inListIds.has(movie.tmdb_id) ? 'secondary' : 'default'}
+                  className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100 disabled:group-hover:opacity-100"
+                >
+                  {inListIds.has(movie.tmdb_id) ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                      Na lista
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      {adding === movie.tmdb_id ? 'Adicionando...' : 'Quero ver'}
+                    </>
+                  )}
+                </Button>
+              </div>
+              <div className="p-2.5">
+                <h3 className="font-heading text-xs font-bold text-foreground truncate" title={movie.title}>
+                  {movie.title}
+                </h3>
+                <p className="text-[10px] text-muted-foreground font-body mt-0.5">
+                  {movie.year} · {movie.genres[0] || '—'}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
 
-        {!loading && filtered.length === 0 && (
+        {filtered.length === 0 && (
           <div className="text-center py-12">
             <p className="text-sm text-muted-foreground font-body">Nenhum filme encontrado</p>
-          </div>
-        )}
-
-        {!loading && !search && page < totalPages && (
-          <div className="flex justify-center mt-10">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => fetchMovies(page + 1, true)}
-              disabled={loadingMore}
-              className="min-w-[180px]"
-            >
-              {loadingMore ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Carregando...
-                </>
-              ) : (
-                <>Buscar mais</>
-              )}
-            </Button>
           </div>
         )}
       </div>
