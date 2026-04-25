@@ -55,15 +55,26 @@ Deno.serve(async (req) => {
       );
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const proxyBase = `${supabaseUrl}/functions/v1/tmdb-image`;
+
+    const toProxy = (rawUrl: string | null | undefined, rawPath: string | null | undefined) => {
+      // Prefer explicit poster_path; otherwise extract path from any tmdb image url
+      let path = rawPath || '';
+      if (!path && rawUrl) {
+        const match = String(rawUrl).match(/\/t\/p\/[^/]+(\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))/i);
+        if (match) path = match[1];
+      }
+      if (!path) return '/placeholder.svg';
+      const clean = path.startsWith('/') ? path : `/${path}`;
+      return `${proxyBase}?path=${encodeURIComponent(clean)}&size=w500`;
+    };
+
     const movies = results.map((m: any) => ({
       tmdb_id: m.id ?? m.tmdb_id,
       title: m.title ?? m.name ?? '',
       year: m.release_date ? parseInt(String(m.release_date).substring(0, 4), 10) : null,
-      poster_url: m.poster_url
-        ? m.poster_url
-        : m.poster_path
-        ? `https://image.tmdb.org/t/p/w500${m.poster_path}`
-        : '/placeholder.svg',
+      poster_url: toProxy(m.poster_url, m.poster_path),
       overview: m.overview || '',
       rating: m.vote_average ?? m.rating ?? 0,
       genres: Array.isArray(m.genres)
