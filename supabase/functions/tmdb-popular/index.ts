@@ -1,43 +1,13 @@
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const WEBHOOK_URL = 'https://sakzq1.app.n8n.cloud/webhook/tmdb';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
-// Standard TMDB genre map (pt-BR)
 const GENRE_MAP: Record<number, string> = {
-  28: 'Ação',
-  12: 'Aventura',
-  16: 'Animação',
-  35: 'Comédia',
-  80: 'Crime',
-  99: 'Documentário',
-  18: 'Drama',
-  10751: 'Família',
-  14: 'Fantasia',
-  36: 'História',
-  27: 'Terror',
-  10402: 'Música',
-  9648: 'Mistério',
-  10749: 'Romance',
-  878: 'Ficção Científica',
-  10770: 'Cinema TV',
-  53: 'Thriller',
-  10752: 'Guerra',
-  37: 'Faroeste',
-};
-
-const buildPosterUrl = (m: any): string => {
-  if (m.poster_url && typeof m.poster_url === 'string' && m.poster_url.startsWith('http')) {
-    return m.poster_url;
-  }
-  if (m.poster_path && typeof m.poster_path === 'string') {
-    return `${TMDB_IMAGE_BASE}${m.poster_path}`;
-  }
-  return '/placeholder.svg';
+  28: 'Ação', 12: 'Aventura', 16: 'Animação', 35: 'Comédia', 80: 'Crime',
+  99: 'Documentário', 18: 'Drama', 10751: 'Família', 14: 'Fantasia',
+  36: 'História', 27: 'Terror', 10402: 'Música', 9648: 'Mistério',
+  10749: 'Romance', 878: 'Ficção Científica', 10770: 'Cinema TV',
+  53: 'Thriller', 10752: 'Guerra', 37: 'Faroeste',
 };
 
 Deno.serve(async (req) => {
@@ -46,65 +16,51 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const token = Deno.env.get('TMDB_API_TOKEN');
+    if (!token) throw new Error('TMDB_API_TOKEN not configured');
+
+    let page = '1';
+    let language = 'pt-BR';
+
     const url = new URL(req.url);
-    let page = url.searchParams.get('page') || '1';
-    let language = url.searchParams.get('language') || 'pt-BR';
+    if (url.searchParams.get('page')) page = url.searchParams.get('page')!;
+    if (url.searchParams.get('language')) language = url.searchParams.get('language')!;
 
     if (req.method === 'POST') {
       try {
         const body = await req.json();
         if (body?.page) page = String(body.page);
         if (body?.language) language = String(body.language);
-      } catch {
-        // empty body is fine
-      }
+      } catch { /* empty body ok */ }
     }
 
-    const webhookUrl = `${WEBHOOK_URL}?language=${encodeURIComponent(language)}&page=${encodeURIComponent(page)}`;
+    const tmdbUrl = `https://api.themoviedb.org/3/movie/popular?language=${encodeURIComponent(language)}&page=${encodeURIComponent(page)}`;
 
-    const response = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { accept: 'application/json' },
+    const response = await fetch(tmdbUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        accept: 'application/json',
+      },
     });
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Webhook error [${response.status}]: ${text}`);
+      throw new Error(`TMDB error [${response.status}]: ${text}`);
     }
 
-    const raw = await response.json();
-    const data = Array.isArray(raw) ? raw[0] : raw;
-    const results: any[] = data?.results || data?.movies || [];
+    const data = await response.json();
+    const results: any[] = data?.results || [];
 
-    // Merge any custom genre map from the webhook with the default TMDB map
-    const genreMap = new Map<number, string>(Object.entries(GENRE_MAP).map(([k, v]) => [Number(k), v]));
-    if (Array.isArray(data?.genres)) {
-      for (const g of data.genres) {
-        if (g?.id && g?.name) genreMap.set(Number(g.id), String(g.name));
-      }
-    } else if (data?.genre_map && typeof data.genre_map === 'object') {
-      for (const [k, v] of Object.entries(data.genre_map)) {
-        genreMap.set(Number(k), String(v));
-      }
-    }
-
-    const movies = results.map((m: any) => {
-      const genres = Array.isArray(m.genres) && m.genres.length
-        ? m.genres.map((g: any) => (typeof g === 'string' ? g : g?.name)).filter(Boolean)
-        : (m.genre_ids || [])
-            .map((id: number) => genreMap.get(Number(id)))
-            .filter(Boolean);
-
-      return {
-        tmdb_id: m.id ?? m.tmdb_id,
-        title: m.title ?? m.name ?? '',
-        year: m.release_date ? parseInt(String(m.release_date).substring(0, 4), 10) : null,
-        poster_url: buildPosterUrl(m),
-        overview: m.overview || '',
-        rating: m.vote_average ?? m.rating ?? 0,
-        genres,
-      };
-    });
+    const movies = results.map((m: any) => ({
+      tmdb_id: m.id,
+      title: m.title ?? m.name ?? '',
+      year: m.release_date ? parseInt(String(m.release_date).substring(0, 4), 10) : null,
+      poster_url: m.poster_path ? `${TMDB_IMAGE_BASE}${m.poster_path}` : '/placeholder.svg',
+      overview: m.overview || '',
+      rating: m.vote_average ?? 0,
+      genres: (m.genre_ids || []).map((id: number) => GENRE_MAP[id]).filter(Boolean),
+    }));
 
     return new Response(
       JSON.stringify({
@@ -112,10 +68,7 @@ Deno.serve(async (req) => {
         page: data?.page ?? Number(page),
         total_pages: data?.total_pages ?? 1,
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
